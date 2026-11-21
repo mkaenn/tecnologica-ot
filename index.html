@@ -1,1 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tecnológica OT</title>
 
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #eef2f7;
+      margin: 0;
+      padding: 15px;
+    }
+
+    .contenedor {
+      max-width: 600px;
+      margin: auto;
+    }
+
+    h1 {
+      text-align: center;
+      color: #0d47a1;
+      margin-top: 10px;
+    }
+
+    .tarjeta {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      padding: 12px;
+      margin-top: 5px;
+      border: 1px solid #bbb;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    textarea {
+      height: 90px;
+      resize: vertical;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 15px;
+      padding: 14px;
+      background: #0d47a1;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 17px;
+    }
+
+    .registro {
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+
+    .registro h3 {
+      margin: 0 0 5px 0;
+      color: #0d47a1;
+    }
+
+    .registro p {
+      margin: 4px 0;
+      color: #444;
+      word-wrap: break-word;
+    }
+
+    .numero {
+      font-size: 18px;
+      font-weight: bold;
+      color: #0d47a1;
+    }
+
+    .eliminar {
+      background: #d32f2f;
+      margin-top: 8px;
+      padding: 8px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="contenedor">
+    <h1>Tecnológica OT</h1>
+
+    <div class="tarjeta">
+      <label>Fecha</label>
+      <input type="date" id="fecha">
+
+      <label>Nombre Cliente</label>
+      <input type="text" id="cliente" placeholder="Nombre del cliente">
+
+      <label>Nombre Contacto</label>
+      <input type="text" id="contacto" placeholder="Nombre de la persona de contacto">
+
+      <label>Materiales utilizados</label>
+      <textarea id="materiales" placeholder="Ejemplo: cable, conectores, tornillos..."></textarea>
+
+      <label>Descripción tarea</label>
+      <textarea id="descripcion" placeholder="Describe el trabajo realizado"></textarea>
+
+      <label>Observaciones</label>
+      <textarea id="observaciones" placeholder="Observaciones adicionales"></textarea>
+
+      <button onclick="guardar()">Guardar OT</button>
+    </div>
+
+    <h2>Órdenes guardadas</h2>
+    <div id="lista"></div>
+  </div>
+
+  <script>
+    let db;
+
+    const peticion = indexedDB.open("TecnologicaOT", 1);
+
+    peticion.onupgradeneeded = function(evento) {
+      db = evento.target.result;
+
+      db.createObjectStore("ordenes", {
+        keyPath: "id",
+        autoIncrement: true
+      });
+    };
+
+    peticion.onsuccess = function(evento) {
+      db = evento.target.result;
+      mostrar();
+    };
+
+    function guardar() {
+      const fecha = document.getElementById("fecha").value;
+      const cliente = document.getElementById("cliente").value;
+      const contacto = document.getElementById("contacto").value;
+      const materiales = document.getElementById("materiales").value;
+      const descripcion = document.getElementById("descripcion").value;
+      const observaciones = document.getElementById("observaciones").value;
+
+      if (fecha === "" || cliente === "") {
+        alert("Debes completar al menos la fecha y el nombre del cliente.");
+        return;
+      }
+
+      const transaccion = db.transaction("ordenes", "readwrite");
+      const almacen = transaccion.objectStore("ordenes");
+
+      almacen.add({
+        fecha: fecha,
+        cliente: cliente,
+        contacto: contacto,
+        materiales: materiales,
+        descripcion: descripcion,
+        observaciones: observaciones
+      });
+
+      transaccion.oncomplete = function() {
+        document.getElementById("fecha").value = "";
+        document.getElementById("cliente").value = "";
+        document.getElementById("contacto").value = "";
+        document.getElementById("materiales").value = "";
+        document.getElementById("descripcion").value = "";
+        document.getElementById("observaciones").value = "";
+
+        mostrar();
+      };
+    }
+
+    function mostrar() {
+      const transaccion = db.transaction("ordenes", "readonly");
+      const pedido = transaccion.objectStore("ordenes").getAll();
+
+      pedido.onsuccess = function() {
+        const lista = document.getElementById("lista");
+        lista.innerHTML = "";
+
+        const ordenes = pedido.result;
+
+        for (let i = 0; i < ordenes.length; i++) {
+          const o = ordenes[i];
+          const numeroOT = "OT-" + String(o.id).padStart(3, "0");
+
+          lista.innerHTML += `
+            <div class="registro">
+              <p class="numero">${numeroOT}</p>
+              <h3>${o.cliente}</h3>
+              <p><b>Fecha:</b> ${o.fecha}</p>
+              <p><b>Contacto:</b> ${o.contacto}</p>
+              <p><b>Materiales:</b> ${o.materiales}</p>
+              <p><b>Descripción:</b> ${o.descripcion}</p>
+              <p><b>Observaciones:</b> ${o.observaciones}</p>
+              <button class="eliminar" onclick="eliminar(${o.id})">Eliminar</button>
+            </div>
+          `;
+        }
+
+        if (ordenes.length === 0) {
+          lista.innerHTML = "<p>No hay órdenes guardadas todavía.</p>";
+        }
+      };
+    }
+
+    function eliminar(id) {
+      const transaccion = db.transaction("ordenes", "readwrite");
+      transaccion.objectStore("ordenes").delete(id);
+
+      transaccion.oncomplete = function() {
+        mostrar();
+      };
+    }
+  </script>
+</body>
+</html>
